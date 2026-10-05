@@ -1,7 +1,7 @@
 [project]
 name = "lipari-bank-ai"
 version = "0.1.0"
-description = "Add your description here"
+description = "LipariBank AI Assistant — Bootcamp Python AI Powered"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

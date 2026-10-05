@@ -1,0 +1,17 @@
+# .github/workflows/check.yml — a ogni push, lo stesso comando che si lancia in locale
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      # --locked: installa esattamente uv.lock, e fallisce se non corrisponde a pyproject.toml.
+      # Senza, uv può risolvere di nuovo e la CI proverebbe dipendenze diverse dalle nostre
+      - run: uv sync --locked
+      - run: uv run --locked python scripts/check.py
