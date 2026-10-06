@@ -48,6 +48,14 @@ Apri nel browser:
 - http://localhost:8000/health — deve rispondere con `"status":"UP"`, l'ambiente e quali chiavi ci sono
 - http://localhost:8000/docs — la documentazione interattiva (Swagger UI)
 
+La pagina di prova chiama l'API da un'altra origine, come farà un frontend. Da un secondo terminale:
+
+```bash
+uv run python -m http.server 5173 --directory client
+```
+
+e apri http://localhost:5173 (non `127.0.0.1`: per il browser è un'altra origine, e il CORS la rifiuta).
+
 ## Configurazione
 
 | Variabile | Obbligatoria | Default | A cosa serve |
@@ -62,6 +70,7 @@ Apri nel browser:
 | `DEFAULT_MODEL` | no | `gpt-4o-mini` | |
 | `EMBEDDING_MODEL` | no | `text-embedding-3-small` | |
 | `MAX_TOKENS_PER_REQUEST` | no | `2000` | un numero intero |
+| `CORS_ORIGINS` | no | `["http://localhost:5173"]` | le origini che il browser può usare; una lista, scritta in JSON |
 
 La configurazione si valida **all'avvio**. Se una variabile manca o ha un valore sbagliato, il processo non parte,
 esce con codice 1 e dice quale variabile e cosa ci va, per esempio:
@@ -93,7 +102,12 @@ I test non hanno bisogno di un `.env`: `conftest.py` nella radice fornisce i due
 
 ```
 src/config.py        la configurazione, validata all'avvio
-src/main.py          l'app FastAPI e la sonda /health
+src/main.py          l'app FastAPI: la sonda /health, gli handler degli errori, request-id, CORS, router
+src/exceptions.py    gli errori di dominio, ognuno col suo codice di stato
+src/types/           i modelli Pydantic: i contratti di ingresso e uscita, la busta d'errore, Problem
+src/api/             i router: chat, glossario, categorizzazione, importazione dei movimenti
+src/services/        la logica: le regole di categorizzazione, l'import del CSV, i messaggi d'errore
+client/index.html    la pagina di prova del CORS, da servire su localhost:5173
 scripts/check.py     il comando unico dei controlli
 tests/               i test (pytest)
 conftest.py          i valori minimi per importare l'app nei test
@@ -112,6 +126,19 @@ che su Windows non c'è, e `uv sync` senza `--locked`. Il numero: 5 controlli in
 Con un `uv.lock` non aggiornato, `uv sync --locked` esce con codice 1. Senza `--locked` risolve 41 pacchetti invece di 38,
 installa `requests 2.34.2` (che nel lock non c'è) e passa.
 Il test `tests/test_check.py` dimostra che un solo passo fallito fa fallire il comando, e che i passi successivi girano comunque.
+
+**Estensione del Giorno 2: la validazione che dice la verità** (`src/types/problem.py`, `src/services/problems.py`).
+Scelto: un solo modello `Problem` (`field`, `code`, `reason`, `found`, `expected`) per i `details` del 422 e per ogni voce di
+`problems` dell'import, che aggiunge solo `row`: lo stesso errore si legge con lo stesso codice, e `code` resta stabile per un
+programma mentre `reason` è la frase per l'ufficio (`amount: trovato «12,50», serve un numero col punto decimale, per esempio 12.50`).
+Scartato: rimandare il valore ricevuto anche nel 422 (il corpo di una richiesta può contenere ciò che non deve uscire; il CSV è
+dell'ufficio che lo ha caricato, e il valore torna tagliato a 40 caratteri) e due forme separate con un adattatore nel client.
+Come lo so: `tests/test_g2_validazione.py` manda la stessa valuta sbagliata come richiesta e come riga di file, e verifica che le due
+voci abbiano gli stessi campi (più `row`), lo stesso `code` e lo stesso `expected`:
+
+```bash
+uv run pytest tests/test_g2_validazione.py -v
+```
 
 ## La prova della ricostruzione
 
